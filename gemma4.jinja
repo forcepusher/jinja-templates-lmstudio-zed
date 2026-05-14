@@ -1,4 +1,31 @@
 {%- set enable_thinking = true %}
+{%- macro type_kind(t) -%}
+    {%- if t is string -%}
+        {{- t | upper -}}
+    {%- elif t is iterable and t is not mapping -%}
+        {%- set ns_tk = namespace(found='') -%}
+        {%- for x in t -%}
+            {%- if x is string and ns_tk.found == '' and (x | upper) != 'NULL' -%}
+                {%- set ns_tk.found = x | upper -%}
+            {%- endif -%}
+        {%- endfor -%}
+        {{- ns_tk.found -}}
+    {%- endif -%}
+{%- endmacro -%}
+{%- macro type_emit(t) -%}
+    {%- if t is string -%}
+        <|"|>{{- t | upper -}}<|"|>
+    {%- elif t is iterable and t is not mapping -%}
+        [
+        {%- for x in t -%}
+            {%- if x is string -%}<|"|>{{- x | upper -}}<|"|>{%- else -%}<|"|><|"|>{%- endif -%}
+            {%- if not loop.last %},{% endif -%}
+        {%- endfor -%}
+        ]
+    {%- else -%}
+        <|"|><|"|>
+    {%- endif -%}
+{%- endmacro -%}
 {%- macro format_parameters(properties, required, filter_keys=false) -%}
     {%- set standard_keys = ['description', 'type', 'properties', 'required', 'nullable'] -%}
     {%- set ns = namespace(found_first=false) -%}
@@ -12,12 +39,12 @@
                 description:<|"|>{{ value['description'] }}<|"|>
                 {%- set add_comma = true -%}
             {%- endif -%}
-            {%- if (value['type'] | default('')) | upper == 'STRING' -%}
+            {%- if type_kind(value['type']) == 'STRING' -%}
                 {%- if value['enum'] -%}
                     {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}
                     enum:{{ format_argument(value['enum']) }}
                 {%- endif -%}
-            {%- elif (value['type'] | default('')) | upper == 'ARRAY' -%}
+            {%- elif type_kind(value['type']) == 'ARRAY' -%}
                 {%- if value['items'] is mapping and value['items'] -%}
                     {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}
                     items:{
@@ -43,7 +70,12 @@
                                 {%- if item_value is string -%}
                                     type:{{ format_argument(item_value | upper) }}
                                 {%- else -%}
-                                    type:{{ format_argument(item_value | map('upper') | list) }}
+                                    type:[
+                                    {%- for t in item_value -%}
+                                        {%- if t is string -%}<|"|>{{- t | upper -}}<|"|>{%- else -%}<|"|><|"|>{%- endif -%}
+                                        {%- if not loop.last %},{% endif -%}
+                                    {%- endfor -%}
+                                    ]
                                 {%- endif -%}
                             {%- else -%}
                                 {{ item_key }}:{{ format_argument(item_value) }}
@@ -57,7 +89,7 @@
                 {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}
                 nullable:true
             {%- endif -%}
-            {%- if (value['type'] | default('')) | upper == 'OBJECT' -%}
+            {%- if type_kind(value['type']) == 'OBJECT' -%}
                 {%- if value['properties'] is defined and value['properties'] is mapping -%}
                     {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}
                     properties:{
@@ -80,7 +112,7 @@
                 {%- endif -%}
             {%- endif -%}
             {%- if add_comma %},{%- else -%} {%- set add_comma = true -%} {% endif -%}
-            type:<|"|>{{ (value['type'] | default('')) | upper }}<|"|>}
+            type:{{ type_emit(value['type']) }}}
         {%- endif -%}
     {%- endfor -%}
 {%- endmacro -%}
@@ -101,7 +133,7 @@
             ],
         {%- endif -%}
         {%- if params['type'] -%}
-            type:<|"|>{{- (params['type'] | default('')) | upper -}}<|"|>}
+            type:{{- type_emit(params['type']) -}}}
         {%- endif -%}
     {%- endif -%}
     {%- if 'response' in tool_data['function'] -%}
@@ -110,8 +142,8 @@
         {%- if response_declaration['description'] -%}
             description:<|"|>{{- response_declaration['description'] -}}<|"|>,
         {%- endif -%}
-        {%- if (response_declaration['type'] | default('')) | upper == 'OBJECT' -%}
-            type:<|"|>{{- (response_declaration['type'] | default('')) | upper -}}<|"|>}
+        {%- if type_kind(response_declaration['type']) == 'OBJECT' -%}
+            type:{{- type_emit(response_declaration['type']) -}}}
         {%- endif -%}
     {%- endif -%}
     }
