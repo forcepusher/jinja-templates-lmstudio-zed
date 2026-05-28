@@ -1,4 +1,6 @@
 {%- set enable_thinking = true %}
+{#- Soft cap for thought channel verbosity, injected into the just-in-time reminder before each generation. Lower this if hangs come back; raise it for harder problems. -#}
+{%- set thought_word_budget = 4000 %}
 {%- macro type_kind(t) -%}
     {%- if t is string -%}
         {{- t | upper -}}
@@ -378,10 +380,15 @@
 {%- endfor -%}
 
 {%- if add_generation_prompt -%}
+    {#- Thought-discipline reminder: prevents Gemma 4 from rambling in the hidden thought channel until max-tokens (visible to user as a multi-minute silent hang). Only injected at fresh turn entries — skipped during in-flight tool cascades to keep the continuation structure intact. -#}
+    {%- if enable_thinking and ns.prev_message_type != 'tool_response' and ns.prev_message_type != 'tool_call' -%}
+        {{- '<|turn>system\nThought-channel discipline: keep your private thought concise (target ' ~ thought_word_budget ~ ' words or fewer), reach a conclusion, then close the thought channel and produce the visible answer or tool call. Do not loop, repeat yourself, or restart reasoning. If the request is simple, skip the thought channel entirely.<turn|>\n' -}}
+    {%- endif -%}
     {%- if ns.prev_message_type != 'tool_response' and ns.prev_message_type != 'tool_call' -%}
         {{- '<|turn>model\n' -}}
-        {%- if not enable_thinking | default(false) -%}
-            {{- '<|channel>thought\n<channel|>' -}}
-        {%- endif -%}
+    {%- endif -%}
+    {#- Empty thought-suppression marker. Fires only when thinking is disabled, for both fresh turns and follow-up turns (mirrors vllm PR #42776). -#}
+    {%- if not enable_thinking | default(false) -%}
+        {{- '<|channel>thought\n<channel|>' -}}
     {%- endif -%}
 {%- endif -%}
