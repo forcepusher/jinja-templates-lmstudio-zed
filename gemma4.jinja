@@ -1,5 +1,4 @@
 {%- set enable_thinking = true %}
-{#- Soft cap for thought channel verbosity, injected into the just-in-time reminder before each generation. Lower this if hangs come back; raise it for harder problems. -#}
 {%- set thought_word_budget = 4000 %}
 {%- macro type_kind(t) -%}
     {%- if t is string -%}
