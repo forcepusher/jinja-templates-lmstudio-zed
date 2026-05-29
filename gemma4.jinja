@@ -234,6 +234,10 @@
         {%- endfor %}
         {%- set ns.prev_message_type = 'tool' -%}
     {%- endif -%}
+    {#- Reasoning-protocol guard: prevents analytical content from leaking into the visible answer after the private thought channel closes. Only emitted when thinking is enabled. The literal special tokens are intentionally NOT written here — they would be tokenized and break the system message. -#}
+    {%- if enable_thinking is defined and enable_thinking -%}
+        {{- '\n\nReasoning protocol: keep all chain-of-thought reasoning, analysis, hypothesis testing, and self-debate inside the private thought channel. The visible portion of your reply (everything written after the thought channel closes) must be a clean conclusion only: a direct answer to the user, a tool call, or a brief user-facing message. Never continue analytical reasoning, hypothesizing, exploring alternatives, or "thinking out loud" in the visible portion. If you find yourself wanting to analyze further after closing the thought channel, re-open a new thought channel for that analysis instead of writing it as visible content. The visible reply is for conclusions and actions, not deliberation.' -}}
+    {%- endif -%}
     {{- '<turn|>\n' -}}
 {%- endif %}
 
