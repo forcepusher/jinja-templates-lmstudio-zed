@@ -65,7 +65,7 @@
         {{- tool | tojson }}
     {%- endfor %}
     {{- "\n</tools>" }}
-    {{- '\n\n## Tool call format\n\nWhen you want to call a tool, emit a <tool_call> block containing a single JSON object with exactly two keys: "name" and "arguments". "arguments" is itself a JSON object holding the named parameters.\n\n<tool_call>\n{"name": "example_function_name", "arguments": {"example_parameter_1": "value_1", "example_parameter_2": "value 2 can span\\nmultiple lines as a JSON string"}}\n</tool_call>\n\nRules:\n- The body of <tool_call>...</tool_call> MUST be valid JSON. Use proper JSON escapes (\\n, \\", \\\\) inside string values.\n- "name" MUST match one of the tools listed above.\n- All required parameters MUST be present in "arguments".\n- For parallel calls, emit several <tool_call> blocks back to back, one JSON object per block.\n- If no tool is needed, answer normally.\n\n## How to take an action\n\nKeep your reasoning prose inside <think>...</think>. When you are ready to act, write </think> to close your reasoning, then write each <tool_call> block in your visible answer. The host reads tool calls only from the visible answer that follows </think>.\n\nTurn shape when you call a tool:\n\n  <think>\n  your reasoning in plain prose\n  </think>\n\n  optional one-line preface in plain English\n  <tool_call>\n  {"name": "fn", "arguments": {"arg": "value"}}\n  </tool_call>' }}
+    {{- '\n\n## Tool call format\n\nWhen you want to call a tool, emit a <tool_call> block containing a single JSON object with exactly two keys: "name" and "arguments". "arguments" is itself a JSON object holding the named parameters.\n\n<tool_call>\n{"name": "example_function_name", "arguments": {"example_parameter_1": "value_1", "example_parameter_2": "value 2 can span\\nmultiple lines as a JSON string"}}\n</tool_call>\n\nRules:\n- The body of <tool_call>...</tool_call> MUST be valid JSON. Use proper JSON escapes (\\n, \\", \\\\) inside string values.\n- "name" MUST match one of the tools listed above.\n- All required parameters MUST be present in "arguments".\n- For parallel calls, emit several <tool_call> blocks back to back, one JSON object per block.\n- If no tool is needed, answer normally.\n\n## How to take an action\n\nKeep your reasoning prose inside <think>...</think>. When you are ready to act, write </think> to close your reasoning, then write each <tool_call> block in your visible answer. The host reads tool calls only from the visible answer that follows </think>.\n\nHard constraints:\n- NEVER write the literal text "<tool_call>" before you have written "</think>". A <tool_call> inside the think block is discarded and the action never runs.\n- Inside <think>, refer to tools by name in plain prose only (e.g. "I will call read_file next"). Never draft or preview the <tool_call> XML/JSON there.\n- The very first thing after </think> may be the <tool_call> block itself.\n\nTurn shape when you call a tool:\n\n  <think>\n  your reasoning in plain prose\n  </think>\n\n  optional one-line preface in plain English\n  <tool_call>\n  {"name": "fn", "arguments": {"arg": "value"}}\n  </tool_call>' }}
     {%- if merged_system %}
         {{- '\n\n' + merged_system }}
     {%- endif %}
@@ -106,6 +106,15 @@
             {%- endif %}
         {%- endif %}
         {%- set reasoning_content = reasoning_content|trim %}
+        {%- if '<tool_call>' in reasoning_content %}
+            {%- set tc_pos = reasoning_content.find('<tool_call>') %}
+            {%- if content %}
+                {%- set content = (reasoning_content[tc_pos:] ~ '\n\n' ~ content)|trim %}
+            {%- else %}
+                {%- set content = reasoning_content[tc_pos:]|trim %}
+            {%- endif %}
+            {%- set reasoning_content = reasoning_content[:tc_pos]|trim %}
+        {%- endif %}
         {%- if reasoning_content and ((preserve_thinking is defined and preserve_thinking is true) or (loop.index0 > ns.last_query_index)) %}
             {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
         {%- else %}
@@ -152,7 +161,7 @@
 {%- endfor %}
 {%- if add_generation_prompt %}
     {%- if tools and tools is iterable and tools is not mapping %}
-        {{- '<|im_start|>system\nReminder: keep your reasoning prose inside <think>...</think>. When ready to act, write </think> to close your reasoning, then write each <tool_call>{"name": ..., "arguments": {...}}</tool_call> block with a valid JSON body in your visible answer. The host reads tool calls only from the visible answer that follows </think>.<|im_end|>\n' }}
+        {{- '<|im_start|>system\nReminder: keep your reasoning prose inside <think>...</think>. When ready to act, first write </think> to close your reasoning, then write each <tool_call>{"name": ..., "arguments": {...}}</tool_call> block with a valid JSON body in your visible answer. NEVER write "<tool_call>" before "</think>" - such calls are discarded and never executed. Do not draft tool-call XML/JSON inside <think>; mention tool names in prose only.<|im_end|>\n' }}
     {%- endif %}
     {{- '<|im_start|>assistant\n' }}
     {%- if enable_thinking is defined and enable_thinking is false %}
